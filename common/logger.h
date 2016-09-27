@@ -4,16 +4,30 @@
 #include <string>
 #include <chrono>
 
+#include <sys/time.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#define gettid() syscall(SYS_gettid)
+
+extern long long utc_timestamp();
+
 namespace swss {
 
-#define SWSS_LOG_ERROR(MSG, ...)       swss::Logger::getInstance().write(swss::Logger::SWSS_ERROR,  ":- %s: " MSG, __FUNCTION__, ##__VA_ARGS__)
-#define SWSS_LOG_WARN(MSG, ...)        swss::Logger::getInstance().write(swss::Logger::SWSS_WARN,   ":- %s: " MSG, __FUNCTION__, ##__VA_ARGS__)
-#define SWSS_LOG_NOTICE(MSG, ...)      swss::Logger::getInstance().write(swss::Logger::SWSS_NOTICE, ":- %s: " MSG, __FUNCTION__, ##__VA_ARGS__)
-#define SWSS_LOG_INFO(MSG, ...)        swss::Logger::getInstance().write(swss::Logger::SWSS_INFO,   ":- %s: " MSG, __FUNCTION__, ##__VA_ARGS__)
-#define SWSS_LOG_DEBUG(MSG, ...)       swss::Logger::getInstance().write(swss::Logger::SWSS_DEBUG,  ":- %s: " MSG, __FUNCTION__, ##__VA_ARGS__)
+#define SWSS_JOIN(x,y) x##y
+#define MACRO_JOIN(x,y) SWSS_JOIN(x,y)
 
-#define SWSS_LOG_ENTER()               swss::Logger::ScopeLogger logger ## __LINE__ (__LINE__, __FUNCTION__)
-#define SWSS_LOG_TIMER(msg)            swss::Logger::ScopeTimer scopetimer ## __LINE__ (__LINE__, __FUNCTION__, msg)
+#define SWSS_LOGGER(LEVEL,L,MSG,...) \
+    swss::Logger::getInstance().write(LEVEL, L ",%s:%d,%d,%d,%lld @ %s @ :- %s: " MSG, \
+            __FILE__, __LINE__, getpid(), gettid(), utc_timestamp(), __PRETTY_FUNCTION__, __FUNCTION__, ##__VA_ARGS__)
+
+#define SWSS_LOG_ERROR(MSG, ...)       SWSS_LOGGER(swss::Logger::SWSS_ERROR,  "e", MSG, ##__VA_ARGS__)
+#define SWSS_LOG_WARN(MSG, ...)        SWSS_LOGGER(swss::Logger::SWSS_WARN,   "w", MSG, ##__VA_ARGS__)
+#define SWSS_LOG_NOTICE(MSG, ...)      SWSS_LOGGER(swss::Logger::SWSS_NOTICE, "n", MSG, ##__VA_ARGS__)
+#define SWSS_LOG_INFO(MSG, ...)        SWSS_LOGGER(swss::Logger::SWSS_INFO,   "i", MSG, ##__VA_ARGS__)
+#define SWSS_LOG_DEBUG(MSG, ...)       SWSS_LOGGER(swss::Logger::SWSS_DEBUG,  "d", MSG, ##__VA_ARGS__)
+
+#define SWSS_LOG_ENTER()               swss::Logger::ScopeLogger MACRO_JOIN(logger, __COUNTER__) (__FILE__, __LINE__, __PRETTY_FUNCTION__, __FUNCTION__)
+#define SWSS_LOG_TIMER(MSG)            swss::Logger::ScopeTimer scopetimer ## __LINE__ (__LINE__, __FUNCTION__, MSG)
 
 class Logger
 {
@@ -42,12 +56,19 @@ public:
     {
         public:
 
-        ScopeLogger(int line, const char *fun);
+        ScopeLogger(const char* file, int line, const char* pretty_function, const char* function);
+
         ~ScopeLogger();
 
         private:
-            const int m_line;
-            const char *m_fun;
+
+            const char* m_file;
+            int m_line;
+            int m_pid;
+            int m_tid;
+            long long m_timestamp;
+            const char* m_pretty_function;
+            const char* m_function;
     };
 
     class ScopeTimer

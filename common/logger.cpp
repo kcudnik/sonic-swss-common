@@ -5,6 +5,15 @@
 #include <syslog.h>
 #include <fstream>
 
+long long utc_timestamp()
+{
+    struct timeval  tv;
+
+    gettimeofday(&tv, NULL);
+
+    return (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000 ;
+}
+
 namespace swss {
 
 Logger::Priority Logger::m_minPrio = Logger::SWSS_NOTICE;
@@ -61,14 +70,17 @@ void Logger::write(Priority prio, const char *fmt, ...)
     va_end(ap);
 }
 
-Logger::ScopeLogger::ScopeLogger(int line, const char *fun) : m_line(line), m_fun(fun)
+Logger::ScopeLogger::ScopeLogger(const char* file, int line, const char* pretty_function, const char* function):
+    m_file(file), m_line(line), m_pretty_function(pretty_function), m_function(function)
 {
-    swss::Logger::getInstance().write(swss::Logger::SWSS_DEBUG, ":> %s: enter", m_fun);
+    swss::Logger::getInstance().write(swss::Logger::SWSS_DEBUG, "d,%s:%d,%d,%d,%lld @ %s @ :> %s: enter",
+            m_file, m_line, getpid(), gettid(), utc_timestamp(), m_pretty_function, m_function);
 }
 
 Logger::ScopeLogger::~ScopeLogger()
 {
-    swss::Logger::getInstance().write(swss::Logger::SWSS_DEBUG, ":< %s: exit", m_fun);
+    swss::Logger::getInstance().write(swss::Logger::SWSS_DEBUG, "d,%s:%d,%d,%d,%lld @ %s @ :< %s: exit",
+            m_file, m_line, getpid(), gettid(), utc_timestamp(), m_pretty_function, m_function);
 }
 
 Logger::ScopeTimer::ScopeTimer(int line, const char *fun, std::string msg) :
