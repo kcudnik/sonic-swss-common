@@ -101,22 +101,27 @@ void Table::dump(TableDump& tableDump)
 
     static std::string luaScript =
 
-        "local keys = redis.call(\"keys\", KEYS[1] .. \":*\")\n"
-        "local res = {}\n"
-
-        "for i,k in pairs(keys) do\n"
-        "   local skeys = redis.call(\"HKEYS\", k)\n"
-        "   local sres={}\n"
-
-        "   for j,sk in pairs(skeys) do\n"
-        "       sres[sk] = redis.call(\"HGET\", k, sk)\n"
-        "   end\n"
-
-        "   res[k] = sres\n"
-
-        "end\n"
-
-        "return cjson.encode(res)\n";
+    "local pattern = KEYS[1] .. \":*\"\n"
+    "local cursor = 0\n"
+    "local res = {}\n"
+    "\n"
+    "while true do\n"
+    "\n"
+    "    local data = redis.call('SCAN', cursor, \"MATCH\", pattern, \"COUNT\", 100)\n"
+    "\n"
+    "    local keys = data[2]\n"
+    "    cursor = data[1]\n"
+    "\n"
+    "    for index, key in pairs(keys) do\n"
+    "       res[key] = redis.call(\"HGETALL\", key)\n"
+    "    end\n"
+    "\n"
+    "    if \"0\" == cursor then\n"
+    "        break;\n"
+    "    end\n"
+    "end\n"
+    "\n"
+    "return cjson.encode(res)\n";
 
     static std::string sha = loadRedisScript(m_db, luaScript);
 
@@ -143,14 +148,16 @@ void Table::dump(TableDump& tableDump)
 
         json jj = it.value();
 
-        for (json::iterator itt = jj.begin(); itt != jj.end(); ++itt)
+        // result is table [key, value, ...]
+
+        for (size_t idx = 0; idx < jj.size(); idx += 2)
         {
-            if (itt.key() == "NULL")
+            if (jj[idx] == "NULL")
             {
                 continue;
             }
 
-            map[itt.key()] = itt.value();
+            map[jj[idx]] = jj[idx+1];
         }
 
         std::string key = it.key().substr(tableNameLen);
