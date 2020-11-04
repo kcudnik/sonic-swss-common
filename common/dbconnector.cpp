@@ -489,9 +489,6 @@ void DBConnector::select(DBConnector *db)
 
     RedisReply r(db, select, REDIS_REPLY_STATUS);
     r.checkStatusOK();
-
-    std::string luaScript = loadLuaScript("redis_multi.lua");
-    db->m_shaRedisMulti = loadRedisScript(db, luaScript);
 }
 
 DBConnector::DBConnector(const DBConnector &other)
@@ -792,6 +789,12 @@ void DBConnector::hmset(const std::unordered_map<std::string, std::vector<std::p
 {
     SWSS_LOG_ENTER();
 
+    if (m_shaRedisMulti.empty())
+    {
+        std::string luaScript = loadLuaScript("redis_multi.lua");
+        m_shaRedisMulti = loadRedisScript(this, luaScript);
+    }
+
     json j;
 
     // pack multi hash to json (takes bout 70 ms for 10k to construct)
@@ -822,6 +825,12 @@ void DBConnector::hmset(const std::unordered_map<std::string, std::vector<std::p
 void DBConnector::hdel(const std::vector<std::string>& keys)
 {
     SWSS_LOG_ENTER();
+
+    if (m_shaRedisMulti.empty())
+    {
+        std::string luaScript = loadLuaScript("redis_multi.lua");
+        m_shaRedisMulti = loadRedisScript(this, luaScript);
+    }
 
     json j = json::array();
 
